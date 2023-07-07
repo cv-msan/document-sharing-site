@@ -18,8 +18,8 @@ spring:
   redis:
     database: 0
     host: ${REDIS_HOST:127.0.0.1}
-    password: ${REDIS_PWD}
-    port: ${REDIS_PORT:6379}
+    password: 123
+    port: ${REDIS_PORT:16379}
     timeout: 3000
     jedis:
       pool:

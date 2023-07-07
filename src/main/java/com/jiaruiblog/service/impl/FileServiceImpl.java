@@ -253,7 +253,7 @@ public class FileServiceImpl implements IFileService {
                 .newArrayList("pdf", "png", "docx", "pptx", "xlsx", "html", "md", "txt");
         try {
             if (file != null && !file.isEmpty()) {
-                String originFileName = file.getOriginalFilename();
+                String originFileName = file.getOriginalFilename();//获取上传文件的原始文件名
                 if (!StringUtils.hasText(originFileName)) {
                     return BaseApiResult.error(MessageConstant.PARAMS_ERROR_CODE, MessageConstant.FORMAT_ERROR);
                 }
@@ -262,7 +262,7 @@ public class FileServiceImpl implements IFileService {
                 if (!availableSuffixList.contains(suffix)) {
                     return BaseApiResult.error(MessageConstant.PARAMS_ERROR_CODE, MessageConstant.FORMAT_ERROR);
                 }
-                String fileMd5 = SecureUtil.md5(file.getInputStream());
+                String fileMd5 = SecureUtil.md5(file.getInputStream());//hutool获取文件的md5
 
                 //已存在该文件，则拒绝保存
                 FileDocument fileDocumentInDb = getByMd5(fileMd5);

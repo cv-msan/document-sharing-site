@@ -3,7 +3,9 @@ package com.jiaruiblog.config;
 import com.jiaruiblog.common.MessageConstant;
 import com.jiaruiblog.util.BaseApiResult;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.auth.AuthenticationException;
+import org.apache.poi.util.StringUtil;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -30,10 +32,13 @@ public class CommonExceptionHandler {
     @ExceptionHandler(value = Exception.class)
     public BaseApiResult handle(Exception e) {
         e.printStackTrace();
+        String message = e.getMessage();
         if (e instanceof MaxUploadSizeExceededException) {
             return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, MessageConstant.FILE_SIZE_ERROR);
         } else if (e instanceof HttpRequestMethodNotSupportedException) {
             return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, MessageConstant.REQUEST_METHOD_ERROR);
+        }else if(StringUtils.isNotBlank(message)){
+            return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE,message);
         }else {
             return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, MessageConstant.OPERATE_FAILED);
         }

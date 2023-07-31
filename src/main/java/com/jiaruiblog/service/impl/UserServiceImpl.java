@@ -6,6 +6,7 @@ import com.jiaruiblog.config.SystemConfig;
 import com.jiaruiblog.entity.User;
 import com.jiaruiblog.entity.dto.BasePageDTO;
 import com.jiaruiblog.entity.dto.RegistryUserDTO;
+import com.jiaruiblog.entity.dto.UserDTO;
 import com.jiaruiblog.entity.dto.UserRoleDTO;
 import com.jiaruiblog.entity.vo.UserVO;
 import com.jiaruiblog.service.IFileService;
@@ -14,6 +15,7 @@ import com.jiaruiblog.util.BaseApiResult;
 import com.jiaruiblog.util.JwtUtil;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -22,9 +24,23 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
+import java.io.*;
 import javax.annotation.Resource;
+import org.json.JSONObject;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,7 +60,7 @@ public class UserServiceImpl implements IUserService {
     public static final String USERNAME = "username";
     public static final String ROLE = "permissionEnum";
     public static final String UPDATE_TIME = "updateDate";
-
+    public static final String GATWWAY = "http://bjmcc-gateway:9999/";
     @Resource
     MongoTemplate mongoTemplate;
 
@@ -83,28 +99,132 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     public BaseApiResult login(RegistryUserDTO userDTO) {
-        Query query = new Query(Criteria.where(USERNAME)
-                .is(userDTO.getUsername()).and("password").is(userDTO.getEncodePassword()));
-        User dbUser = mongoTemplate.findOne(query, User.class, COLLECTION_NAME);
-        if (dbUser == null) {
-            return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, MessageConstant.OPERATE_FAILED);
-        }
-        // 屏蔽用户禁止访问
-        if (Boolean.TRUE.equals(dbUser.getBanning())) {
-            return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, MessageConstant.USER_HAS_BANNED);
-        }
+        //此处改为调用pigx的用户登陆
 
-        String token = JwtUtil.createToken(dbUser);
-        Map<String, String> result = new HashMap<>(8);
-        result.put("token", token);
-        result.put("userId", dbUser.getId());
-        result.put(AVATAR, dbUser.getAvatar());
-        result.put(USERNAME, dbUser.getUsername());
-        result.put("type", dbUser.getPermissionEnum() != null ? dbUser.getPermissionEnum().toString() : null);
+//        Query query = new Query(Criteria.where(USERNAME)
+//                .is(userDTO.getUsername()).and("password").is(userDTO.getEncodePassword()));
+//        User dbUser = mongoTemplate.findOne(query, User.class, COLLECTION_NAME);
+//        if (dbUser == null) {
+//            return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, MessageConstant.OPERATE_FAILED);
+//        }
+//        // 屏蔽用户禁止访问
+//        if (Boolean.TRUE.equals(dbUser.getBanning())) {
+//            return BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, MessageConstant.USER_HAS_BANNED);
+//        }
+//
+//        String token = JwtUtil.createToken(dbUser);
+//        Map<String, String> result = new HashMap<>(8);
+//        result.put("token", token);
+//        result.put("userId", dbUser.getId());
+//        result.put(AVATAR, dbUser.getAvatar());
+//        result.put(USERNAME, dbUser.getUsername());
+//        result.put("type", dbUser.getPermissionEnum() != null ? dbUser.getPermissionEnum().toString() : null);
+        Map<String, String> result = getToken(userDTO.getUsername(), userDTO.getPassword());
+
         return BaseApiResult.success(result);
 
     }
 
+    public  Map<String, String> getToken(String username, String password) {
+        HttpClient httpClient = HttpClients.createDefault();
+        HttpPost httpPost = new HttpPost("http://127.0.0.1:9999/admin/oauth2/token");
+
+        // Set request headers
+        httpPost.setHeader(HttpHeaders.AUTHORIZATION, "Basic dGVzdDp0ZXN0");
+
+        // Set request body
+        String requestBody = "grant_type=password&username="+username+"&password="+password;
+        httpPost.setEntity(new StringEntity(requestBody, ContentType.APPLICATION_FORM_URLENCODED));
+        Map<String, String> result = new HashMap<>();
+        JSONObject responseJson = null;
+        try {
+            HttpResponse response = httpClient.execute(httpPost);
+            HttpEntity responseEntity = response.getEntity();
+            if (responseEntity != null) {
+                String responseString = EntityUtils.toString(responseEntity);
+                responseJson = new JSONObject(responseString);
+
+                // 获取具体字段的值
+                String accessToken = responseJson.getString("access_token");
+                result.put("token", accessToken);
+                result.put("userId","user_id");
+                result.put("avatar",GATWWAY+responseJson.getString("user_avatar"));
+                result.put(USERNAME,responseJson.getString("username"));
+                result.put("type", "ADMIN");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (JSONException e) {
+            throw new RuntimeException("用户名不存在或者密码错误");
+
+        }
+        return result;
+    }
+    public UserDTO getUserInfo(String token, String userName) throws Exception {
+        // 设置请求URL和参数
+        String urlStr = GATWWAY+"admin/user/info/"+userName;
+        BufferedReader reader = null;
+        HttpURLConnection connection = null;
+        StringBuilder response = new StringBuilder();
+        URL url ;
+        try {
+            url = new URL(urlStr);
+            // 创建连接对象
+            connection = (HttpURLConnection) url.openConnection();
+            // 设置请求头
+            connection.setRequestProperty("Authorization", "Bearer "+token);
+            // 设置请求方法为GET
+            connection.setRequestMethod("GET");
+            // 发送请求并获取响应
+            int responseCode = connection.getResponseCode();
+
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            } else {
+                reader = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
+            }
+            // 读取响应内容
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        }finally {
+            if(reader!= null){
+                reader.close();
+            }
+            if (connection!=null){
+                // 关闭连接
+                connection.disconnect();
+            }
+        }
+        JSONObject responseJson = new JSONObject(response.toString());
+        Integer code = responseJson.getInt("code");
+        if (code !=0)BaseApiResult.error(MessageConstant.PROCESS_ERROR_CODE, "当前用户不存在！");
+        JSONObject data = responseJson.getJSONObject("data");
+        UserDTO userDTO = new UserDTO();
+        if(data!=null){
+            JSONObject sysUser = data.getJSONObject("sysUser");
+            if(sysUser != null ){
+                String username = sysUser.getString("username");
+                String deptId = sysUser.getString("deptId");
+                String phone = sysUser.getString("phone");
+                String email = sysUser.getString("email");
+                String id = sysUser.getString("userId");
+                String password = sysUser.getString("password");
+                userDTO.setId(id);
+                userDTO.setPassword(password);
+                userDTO.setMail(email);
+                userDTO.setPhone(phone);
+                userDTO.setDeptId(deptId);
+                userDTO.setName(username);
+            }
+        }
+        return userDTO;
+
+    }
     @Override
     public BaseApiResult registry(RegistryUserDTO userDTO) {
         User user = new User();

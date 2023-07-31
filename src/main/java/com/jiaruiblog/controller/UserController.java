@@ -178,10 +178,10 @@ public class UserController {
         if (!StringUtils.hasText(token)) {
             return BaseApiResult.error(MessageConstant.PARAMS_ERROR_CODE, MessageConstant.OPERATE_FAILED);
         }
-        Map<String, Claim> userData = JwtUtil.verifyToken(token);
-        if (CollectionUtils.isEmpty(userData)) {
-            return BaseApiResult.error(MessageConstant.PARAMS_ERROR_CODE, MessageConstant.OPERATE_FAILED);
-        }
+//        Map<String, Claim> userData = JwtUtil.verifyToken(token);
+//        if (CollectionUtils.isEmpty(userData)) {
+//            return BaseApiResult.error(MessageConstant.PARAMS_ERROR_CODE, MessageConstant.OPERATE_FAILED);
+//        }
         return BaseApiResult.success(MessageConstant.SUCCESS);
     }
 

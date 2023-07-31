@@ -1,10 +1,14 @@
 package com.jiaruiblog.filter;
 
 import com.auth0.jwt.interfaces.Claim;
+import com.jiaruiblog.entity.dto.UserDTO;
+import com.jiaruiblog.service.IUserService;
 import com.jiaruiblog.util.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import javax.servlet.*;
 import javax.servlet.annotation.WebFilter;
 import javax.servlet.http.HttpServletRequest;
@@ -13,6 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * JWT过滤器，拦截 /secure的请求
@@ -36,7 +41,8 @@ public class JwtFilter implements Filter
      * 安全的url，不需要令牌
      */
     private static final List<String> SAFE_URL_LIST = Arrays.asList("/userInfo/login", "/userInfo/register");
-
+    @Resource
+    private  IUserService userService;
 
 
     @Override
@@ -53,7 +59,7 @@ public class JwtFilter implements Filter
 
         //获取 header里的token
         final String token = request.getHeader("authorization");
-
+        final String userName = request.getHeader("username");
         if (OPTIONS.equals(request.getMethod())) {
             response.setStatus(HttpServletResponse.SC_OK);
             chain.doFilter(request, response);
@@ -64,15 +70,24 @@ public class JwtFilter implements Filter
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 return;
             }
+            UserDTO userInfo = null;
+            try {
+                userInfo = userService.getUserInfo(token, userName);
+            } catch (Exception e) {
 
-            Map<String, Claim> userData = JwtUtil.verifyToken(token);
-            if (CollectionUtils.isEmpty(userData)) {
+
+            }
+//            Map<String, Claim> userData = JwtUtil.verifyToken(token);
+//            if (CollectionUtils.isEmpty(userData)) {
+//                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//            }
+            if(Objects.isNull(userInfo)){
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             } else {
                 //拦截器 拿到用户信息，放到request中
-                request.setAttribute("id", userData.get("id").asString());
-                request.setAttribute("username", userData.get("username").asString());
-                request.setAttribute("password", userData.get("password").asString());
+                request.setAttribute("id", userInfo.getId());
+                request.setAttribute("username", userInfo.getName());
+                request.setAttribute("password", userInfo.getPassword());
                 chain.doFilter(req, res);
             }
         }

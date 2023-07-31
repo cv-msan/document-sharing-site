@@ -12,10 +12,11 @@ import lombok.Data;
 @Data
 public class UserDTO {
 
-
+    private String id;
     private String password;
-
+    private String deptId;
     private String phone;
+    private String name;
 
     private String mail;
 

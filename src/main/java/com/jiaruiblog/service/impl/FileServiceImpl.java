@@ -240,15 +240,15 @@ public class FileServiceImpl implements IFileService {
      * @Param [file, userId, username]
      **/
     @Override
-    public BaseApiResult documentUpload(MultipartFile file, String userId, String username) throws AuthenticationException {
-        User user = userService.queryById(userId);
-        if (user == null) {
-            throw new AuthenticationException();
-        }
+    public BaseApiResult documentUpload(MultipartFile file,String userId, String username) throws AuthenticationException {
+//        User user = userService.queryById(userId);
+//        if (user == null) {
+//            throw new AuthenticationException();
+//        }
         // 用户非管理员且普通用户禁止
-        if (Boolean.TRUE.equals(!systemConfig.getUserUpload()) && user.getPermissionEnum() != PermissionEnum.ADMIN) {
-            throw new AuthenticationException();
-        }
+//        if (Boolean.TRUE.equals(!systemConfig.getUserUpload()) && user.getPermissionEnum() != PermissionEnum.ADMIN) {
+//            throw new AuthenticationException();
+//        }
         List<String> availableSuffixList = com.google.common.collect.Lists
                 .newArrayList("pdf", "png", "docx", "pptx", "xlsx", "html", "md", "txt");
         try {

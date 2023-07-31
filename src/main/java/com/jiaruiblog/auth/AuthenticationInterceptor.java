@@ -2,8 +2,11 @@ package com.jiaruiblog.auth;
 
 import com.auth0.jwt.interfaces.Claim;
 import com.jiaruiblog.entity.User;
+import com.jiaruiblog.entity.dto.UserDTO;
 import com.jiaruiblog.service.IUserService;
 import com.jiaruiblog.util.JwtUtil;
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONException;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.method.HandlerMethod;
@@ -12,7 +15,9 @@ import org.springframework.web.servlet.ModelAndView;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -34,73 +39,91 @@ public class AuthenticationInterceptor implements HandlerInterceptor {
         this.userService = userService;
     }
 
-
+    /**
+     * 重写此处拦截器，当请求路径为登陆时不拦截其他情况校验token并根据token获取用户信息才放行
+     * @param request
+     * @param response
+     * @param handler
+     * @return
+     */
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-
-        // 如果不是映射到方法直接通过
-        if (!(handler instanceof HandlerMethod)) {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        String requestURI = request.getRequestURI();
+        String method = request.getMethod();
+        if (requestURI.contains("user/login")|| StringUtils.equals("OPTIONS",method)){
             return true;
         }
-        // 获取方法中的注解
-        HandlerMethod handlerMethod = (HandlerMethod) handler;
-        Method method = handlerMethod.getMethod();
+        //获取 header里的token并查出当前用户信息来给后边使用
+        final String token = request.getHeader("authorization");
+        final String userName = request.getHeader("username");
+        if (StringUtils.isNotBlank(token)&&StringUtils.isNotBlank(userName)){
+            UserDTO userInfo = userService.getUserInfo(token, userName);
+            request.setAttribute("currUser",userInfo);
+            return true;
+        }
+        return false;
+//        // 如果不是映射到方法直接通过
+//        if (!(handler instanceof HandlerMethod)) {
+//            return true;
+//        }
+//        // 获取方法中的注解
+//        HandlerMethod handlerMethod = (HandlerMethod) handler;
+//        Method method = handlerMethod.getMethod();
         // 省略判断是否需要登录的方法.....
 
-        // 获取类注解
-        Permission permissionClass = AnnotationUtils.findAnnotation(handlerMethod.getBeanType(), Permission.class);
-        // 获取方法注解
-        Permission permissionMethod = AnnotationUtils.findAnnotation(method, Permission.class);
-
-        // 判断是否需要权限校验
-        if (permissionClass == null && permissionMethod == null) {
-            // 不需要校验权限，直接放行
-            return true;
-        }
+//        // 获取类注解
+//        Permission permissionClass = AnnotationUtils.findAnnotation(handlerMethod.getBeanType(), Permission.class);
+//        // 获取方法注解
+//        Permission permissionMethod = AnnotationUtils.findAnnotation(method, Permission.class);
+//
+//        // 判断是否需要权限校验
+//        if (permissionClass == null && permissionMethod == null) {
+//            // 不需要校验权限，直接放行
+//            return true;
+//        }
 
         // 省略Token解析的方法.....
 
         //获取 header里的token
-        final String token = request.getHeader("authorization");
-        if (token == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return false;
-        }
-        Map<String, Claim> userData = JwtUtil.verifyToken(token);
-
-        if (CollectionUtils.isEmpty(userData)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return false;
-        }
-        // 此处根据自己的系统架构，通过Token或Cookie等获取用户信息。
-        User userInfo = userService.queryById(userData.get("id").asString());
-        if (userInfo == null || userInfo.getPermissionEnum() == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return false;
-        }
-
-        // 获取该方法注解，优先级:方法注解>类注解
-        PermissionEnum[] permissionEnums;
-        if (permissionClass != null && permissionMethod == null) {
-            // 类注解不为空，方法注解为空，使用类注解
-            permissionEnums = permissionClass.name();
-        } else if (permissionClass == null) {
-            // 类注解为空，使用方法注解
-            permissionEnums = permissionMethod.name();
-        } else {
-            // 都不为空，使用方法注解
-            permissionEnums = permissionMethod.name();
-        }
+//        final String token = request.getHeader("authorization");
+//        if (token == null) {
+//            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//            return false;
+//        }
+//        Map<String, Claim> userData = JwtUtil.verifyToken(token);
+//
+//        if (CollectionUtils.isEmpty(userData)) {
+//            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//            return false;
+//        }
+//        // 此处根据自己的系统架构，通过Token或Cookie等获取用户信息。
+//        User userInfo = userService.queryById(userData.get("id").asString());
+//        if (userInfo == null || userInfo.getPermissionEnum() == null) {
+//            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//            return false;
+//        }
+//        // 获取该方法注解，优先级:方法注解>类注解
+//        PermissionEnum[] permissionEnums;
+//        if (permissionClass != null && permissionMethod == null) {
+//            // 类注解不为空，方法注解为空，使用类注解
+//            permissionEnums = permissionClass.name();
+//        } else if (permissionClass == null) {
+//            // 类注解为空，使用方法注解
+//            permissionEnums = permissionMethod.name();
+//        } else {
+//            // 都不为空，使用方法注解
+//            permissionEnums = permissionMethod.name();
+//        }
 
         // 校验该用户是否有改权限
-        // 校验方法可自行实现，拿到permissionEnums中的参数进行比较
-        if (userService.checkPermissionForUser(userInfo, permissionEnums)) {
-            // 拥有权限
-            return true;
-        } else {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return false;
-        }
+//        // 校验方法可自行实现，拿到permissionEnums中的参数进行比较
+//        if (userService.checkPermissionForUser(userInfo, permissionEnums)) {
+//            // 拥有权限
+//            return true;
+//        } else {
+//            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//            return false;
+//        }
     }
 
     /**

@@ -4,10 +4,13 @@ import com.jiaruiblog.auth.PermissionEnum;
 import com.jiaruiblog.entity.User;
 import com.jiaruiblog.entity.dto.BasePageDTO;
 import com.jiaruiblog.entity.dto.RegistryUserDTO;
+import com.jiaruiblog.entity.dto.UserDTO;
 import com.jiaruiblog.entity.dto.UserRoleDTO;
 import com.jiaruiblog.util.BaseApiResult;
+import org.json.JSONException;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -88,4 +91,5 @@ public interface IUserService {
      **/
     BaseApiResult resetUserPwd(String userId, String adminId);
 
+    UserDTO getUserInfo(String token, String userName) throws Exception;
 }
